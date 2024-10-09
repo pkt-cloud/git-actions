@@ -1,0 +1,131 @@
+name: CI-CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # Step 1: SonarQube Static Code Analysis
+  sonar:
+    name: SonarQube Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+
+      - name: Install dependencies (backend)
+        working-directory: ./backend
+        run: npm install
+
+      - name: Install dependencies (frontend)
+        working-directory: ./frontend
+        run: npm install
+
+      - name: SonarQube Scan (backend)
+        working-directory: ./backend
+        run: |
+          npm run build
+          sonar-scanner \
+            -Dsonar.projectKey=backend \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+      - name: SonarQube Scan (frontend)
+        working-directory: ./frontend
+        run: |
+          npm run build
+          sonar-scanner \
+            -Dsonar.projectKey=frontend \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+  # Step 2: Unit Tests and Code Coverage (Jasmine)
+  tests:
+    name: Run Unit Tests and Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies (backend)
+        working-directory: ./backend
+        run: npm install
+
+      - name: Run Unit Tests (backend)
+        working-directory: ./backend
+        run: npm run test
+
+      - name: Install dependencies (frontend)
+        working-directory: ./frontend
+        run: npm install
+
+      - name: Run Unit Tests (frontend)
+        working-directory: ./frontend
+        run: npm run test
+
+  # Step 3: Build and Publish
+  build:
+    name: Build Backend and Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Build Backend
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: npm run build
+
+  # Step 4: Code Signing and Packaging (Black Duck)
+  code_signing:
+    name: Code Signing with Black Duck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies (backend)
+        working-directory: ./backend
+        run: npm install
+
+      - name: Build Backend
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Black Duck Code Sign
+        run: |
+          blackduck scan --token ${{ secrets.BLACKDUCK_API_TOKEN }} --project backend
+
+  # Step 5: Upload Artifacts to JFrog Artifactory
+  upload_artifacts:
+    name: Upload Artifacts to JFrog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Upload Backend Artifact
+        run: |
+          curl -u ${{ secrets.JFROG_USERNAME }}:${{ secrets.JFROG_PASSWORD }} \
+          -T ./backend/build/*.tar.gz \
+          "${{ secrets.JFROG_URL }}/artifactory/my-repo/backend/"
+
+      - name: Upload Frontend Artifact
+        run: |
+          curl -u ${{ secrets.JFROG_USERNAME }}:${{ secrets.JFROG_PASSWORD }} \
+          -T ./frontend/build/*.tar.gz \
+          "${{ secrets.JFROG_URL }}/artifactory/my-repo/frontend/"
