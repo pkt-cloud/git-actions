@@ -37,7 +37,8 @@ jobs:
           sonar-scanner \
             -Dsonar.projectKey=backend \
             -Dsonar.sources=. \
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.host.url=http://localhost:9000 \
+            # -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
       - name: SonarQube Scan (frontend)
